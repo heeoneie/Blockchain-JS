@@ -1,0 +1,18 @@
+# Node.js
+node_modules/
+npm-debug.log
+
+# IDEs
+.idea/
+.vscode/
+
+# Build outputs
+dist/
+build/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# dotenv environment variables file
+.env
