@@ -18,6 +18,8 @@
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.4",
+    "@types/request-promise": "^4.1.51",
+    "@types/sha256": "^0.2.2",
     "typescript": "^5.8.3"
   }
 }
