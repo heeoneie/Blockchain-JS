@@ -184,7 +184,7 @@ app.post('/receive-new-block', function (req, res) {
     }
 })
 
-app.post('/register-and-broadcast-node', function (req, res) {
+app.post('/register-and-broadcast-node', async function (req, res) {
     const newNodeUrl = req.body.newNodeUrl as string
     try {
         new URL(newNodeUrl)
@@ -192,18 +192,21 @@ app.post('/register-and-broadcast-node', function (req, res) {
         res.status(400).json({ error: 'Invalid URL format' })
         return
     }
-    if(bitcoin.currentNodeUrl === newNodeUrl) {
-        res.json({ note: `Current node cannot be registered` });
-        return;
+
+    if (bitcoin.currentNodeUrl === newNodeUrl) {
+        res.json({ note: `Current node cannot be registered` })
+        return
     }
 
-    // health check
-    rp({
-        uri: newNodeUrl + '/healthcheck',
-        method: 'GET',
-    }).then(() => {
-        if (bitcoin.networkNodes.indexOf(newNodeUrl) == -1)
+    try {
+        await rp({
+            uri: newNodeUrl + '/healthcheck',
+            method: 'GET',
+        })
+
+        if (bitcoin.networkNodes.indexOf(newNodeUrl) == -1) {
             bitcoin.networkNodes.push(newNodeUrl)
+        }
 
         const regNodesPromises = bitcoin.networkNodes.map((networkNodeUrl) => {
             const requestOptions = {
@@ -212,27 +215,28 @@ app.post('/register-and-broadcast-node', function (req, res) {
                 body: { newNodeUrl },
                 json: true,
             }
-
             return rp(requestOptions)
         })
+        await Promise.all(regNodesPromises)
 
-        Promise.all(regNodesPromises)
-            .then(() => {
-                const bulkRegisterOptions = {
-                    uri: newNodeUrl + '/register-nodes-bulk',
-                    method: 'POST',
-                    body: {
-                        allNetworkNodes: [...bitcoin.networkNodes, bitcoin.currentNodeUrl],
-                    },
-                    json: true,
-                }
-                return rp(bulkRegisterOptions)
-            })
-            .then(() => {
-                res.json({ note: 'New node registered with network successfully.' })
-            })
-            .catch((e) => res.json({ note: `Unexpected error: ${e}` }))
-    }).catch(() => {res.json({ note: `The node doesn't respond` })})
+        const bulkRegisterOptions = {
+            uri: newNodeUrl + '/register-nodes-bulk',
+            method: 'POST',
+            body: {
+                allNetworkNodes: [...bitcoin.networkNodes, bitcoin.currentNodeUrl],
+            },
+            json: true,
+        }
+        await rp(bulkRegisterOptions)
+        res.json({ note: 'New node registered with network successfully.' })
+
+    } catch (e: any) {
+        if (e.statusCode === undefined) {
+            res.json({ note: `The node doesn't respond` })
+        } else {
+            res.json({ note: `Unexpected error: ${e}` })
+        }
+    }
 })
 
 app.post('/register-node', function (req, res) {
