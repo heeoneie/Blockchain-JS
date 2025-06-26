@@ -10,5 +10,9 @@
   "license": "ISC",
   "dependencies": {
     "sha256": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.4",
+    "typescript": "^5.8.3"
   }
 }
