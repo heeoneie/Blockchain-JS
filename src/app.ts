@@ -8,6 +8,7 @@ import rp from 'request-promise'
 import { coreErrorToWebResponse, responseWith } from './response-mapper'
 import { Block } from './types/Block'
 import { List } from 'immutable'
+import path from 'path'
 
 const port = parseInt(process.argv[2])
 if (!port || port < 1 || port > 65535) {
@@ -169,7 +170,7 @@ app.post('/receive-new-block', function (req, res) {
             res.status(400).json({ note: 'Invalid block hash' })
             return
         }
-        bitcoin.chain.push(newBlock)
+        bitcoin.chain = [...bitcoin.chain, newBlock]
         bitcoin.pendingTransactions = []
         res.json({
             note: 'New block received and accepted.',
@@ -292,6 +293,12 @@ app.get('/consensus', function (_req, res) {
                 chain: bitcoin.chain,
             })
         }
+    }).catch((e) => {
+        console.error('Consensus failed:', e)
+        res.status(500).json({
+            error: 'Failed to reach consensus with network nodes',
+            chain: bitcoin.chain
+        })
     })
 })
 
@@ -320,7 +327,8 @@ app.get('/address/:address', function (req, res) {
 })
 
 app.get('/block-explorer', function (req, res) {
-    res.sendFile('./block-explorer/index.html', { root: __dirname })
+    const filePath = path.resolve(__dirname, 'block-explorer', 'index.html')
+    res.sendFile(filePath)
 })
 
 app.listen(port, function () {
