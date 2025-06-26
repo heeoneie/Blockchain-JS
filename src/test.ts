@@ -1,7 +1,7 @@
 import Blockchain from './core/blockchain'
-import { Default } from './libs/jinx/default'
-import { Result, ok } from './libs/jinx/result'
-import { ResultExtension } from './libs/jinx/result-extension'
+import { Default } from './libs/default'
+import { ok } from './libs/result'
+import { ResultExtension } from './libs/result-extension'
 
 const bitcoin = new Blockchain()
 
@@ -144,11 +144,12 @@ const bc1 = {
 
 console.log('VALID: ', bitcoin.chainIsValid(bc1.chain).isOk)
 console.log(bitcoin.chainIsValid(bc1.chain).isOkAnd(() => true))
-class Number implements Default<Number> {
+
+class NumberValue implements Default<NumberValue> {
     constructor(public n: number) {}
 
-    default(): Number {
-        return new Number(0)
+    default(): NumberValue {
+        return new NumberValue(0)
     }
 }
-console.log(ok(new Number(3)).let(ResultExtension.unwrapOrDefault))
+console.log(ok(new NumberValue(3)).let(ResultExtension.unwrapOrDefault))

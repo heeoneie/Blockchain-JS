@@ -1,10 +1,9 @@
 import sha256 from 'sha256'
-const currentNodeUrl = process.argv[3]
 import uuid from 'uuid'
 import { Range } from 'immutable'
-import { Result, err, ok } from '../libs/jinx/result'
+import { Result, err, ok } from '../libs/result'
 import { CoreError } from './error'
-import { Option, none, nullable, some } from '../libs/jinx/option'
+import { Option, none, nullable, some } from '../libs/option'
 import { BlockData, IBlockchain } from './iBlockchain'
 import { Block } from '../types/Block'
 import { Transaction } from '../types/Transaction'
@@ -12,11 +11,11 @@ import { Transaction } from '../types/Transaction'
 export default class Blockchain implements IBlockchain {
     constructor(
         public chain: Block[] = [],
-        public pendingTransactions: Transaction[] = [], // private networkNodes: String[] = [],
-        private readonly _currentNodeUrl: string = currentNodeUrl,
+        public pendingTransactions: Transaction[] = [],
+        private readonly _currentNodeUrl: string = process.argv[3] || 'http://localhost:3000',
         public networkNodes: string[] = []
     ) {
-        this.createNewBlock(100, '0', '0') // genesis
+        this.createNewBlock(100, '0', '0')
     }
 
     get currentNodeUrl(): string {
@@ -98,7 +97,7 @@ export default class Blockchain implements IBlockchain {
         }
     }
 
-    chainIsValid(blockchain: Block[]): Result<{}, CoreError> {
+    chainIsValid(blockchain: Block[]): Result<void, CoreError> {
         for (let i = 1; i < blockchain.length; i++) {
             const currentBlock = blockchain[i]
             const prevBlock = blockchain[i - 1]
@@ -143,7 +142,7 @@ export default class Blockchain implements IBlockchain {
             })
         }
 
-        return ok({})
+        return ok(undefined)
     }
 
     getBlock(blockHash: string): Option<Block> {
@@ -172,7 +171,7 @@ export default class Blockchain implements IBlockchain {
                 (transaction) =>
                     transaction.sender === address || transaction.recipient === address
             )
-        if (transactions.length == 0) {
+        if (transactions.length === 0) {
             return none()
         }
         const balance = transactions
@@ -187,7 +186,7 @@ export default class Blockchain implements IBlockchain {
             balance,
         })
     }
-
+    private static readonly GENESIS_ADDRESS = '00'
     private checkBalance = ({
                                 address,
                                 amount,
@@ -195,8 +194,7 @@ export default class Blockchain implements IBlockchain {
         address: string
         amount: number
     }): Result<{}, CoreError> => {
-        if (address == '00') {
-            // Genesis has a lot of money.
+        if (address == Blockchain.GENESIS_ADDRESS) {
             return ok({})
         }
         return this.getAddressData(address).mapEach({

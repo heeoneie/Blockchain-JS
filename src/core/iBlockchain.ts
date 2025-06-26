@@ -1,5 +1,5 @@
-import { Option } from '../libs/jinx/option'
-import { Result } from '../libs/jinx/result'
+import { Option } from '../libs/option'
+import { Result } from '../libs/result'
 import { Block } from '../types/Block'
 import { Transaction } from '../types/Transaction'
 import { CoreError } from './error'
@@ -28,7 +28,7 @@ export interface IBlockchain {
         previousBlockHash: string,
         currentBlockData: BlockData
     ): Result<number, CoreError>
-    chainIsValid(blockchain: Block[]): Result<{}, CoreError>
+    chainIsValid(blockchain: Block[]): Result<void, CoreError>
     getBlock(blockHash: string): Option<Block>
     getTransaction(
         transactionId: string

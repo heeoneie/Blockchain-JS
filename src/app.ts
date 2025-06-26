@@ -1,15 +1,20 @@
 import express from 'express'
 const app = express()
 import bodyParser from 'body-parser'
-import uuid from 'uuid'
+import { v4 as uuidv4 } from 'uuid'
 import Blockchain from './core/blockchain'
 import { IBlockchain } from './core/iBlockchain'
 import rp from 'request-promise'
 import { coreErrorToWebResponse, responseWith } from './response-mapper'
 import { Block } from './types/Block'
 import { List } from 'immutable'
-const port = process.argv[2]
-const nodeAddress = uuid.v1().split('-').join('')
+
+const port = parseInt(process.argv[2])
+if (!port || port < 1 || port > 65535) {
+    console.error('Please provide a valid port number')
+    process.exit(1)
+}
+const nodeAddress = uuidv4().split('-').join('')
 
 const bitcoin = new Blockchain() as IBlockchain
 
@@ -28,6 +33,10 @@ app.get('/blockchain', function (req, res) {
 // create a new transaction
 app.post('/transaction', function (req, res) {
     const newTransaction = req.body
+    if (!newTransaction.amount || !newTransaction.sender || !newTransaction.recipient) {
+        res.status(400).json({ error: 'Missing required transaction fields' })
+        return
+    }
     bitcoin.addTransactionToPendingTransactions(newTransaction).let((result) => {
         responseWith({
             res,
@@ -39,7 +48,11 @@ app.post('/transaction', function (req, res) {
     })
 })
 
-app.post('/transaction/broadcast', function (req, res) {
+app.post('/transaction/broadcast', async function (req, res) {
+    if (typeof req.body.amount !== 'number' || req.body.amount <= 0) {
+        res.status(400).json({ error: 'Invalid amount' })
+        return
+    }
     const result = bitcoin.createNewTransaction(
         req.body.amount,
         req.body.sender,
@@ -62,15 +75,16 @@ app.post('/transaction/broadcast', function (req, res) {
         return rp(requestOptions)
     })
 
-    Promise.all(requestPromises)
-        .then(() => {
-            res.json({ note: 'Transaction created and broadcast successfully.' })
-        })
-        .catch((e) => {
-            res.json({ note: `Unexpected error: ${e}` })
-        })
+    try {
+        await Promise.all(requestPromises)
+        res.json({ note: 'Transaction created and broadcast successfully.' })
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        res.status(500).json({ error: `Unexpected error: ${message}` })
+    }
 })
 
+const MINING_REWARD = process.env.MINING_REWARD ? parseFloat(process.env.MINING_REWARD) : 12.5
 app.get('/mine', function (req, res) {
     const lastBlock = bitcoin.lastBlock
     const previousBlockHash = lastBlock.hash
@@ -109,7 +123,7 @@ app.get('/mine', function (req, res) {
                 uri: bitcoin.currentNodeUrl + '/transaction/broadcast',
                 method: 'POST',
                 body: {
-                    amount: 12.5,
+                    amount: MINING_REWARD,
                     sender: '00',
                     recipient: nodeAddress,
                 },
@@ -133,6 +147,15 @@ app.post('/receive-new-block', function (req, res) {
     const correctIndex = lastBlock.index + 1 === newBlock.index
 
     if (correctHash && correctIndex) {
+        const blockHash = bitcoin.hashBlock(
+            newBlock.previousBlockHash,
+            { transactions: newBlock.transactions, index: newBlock.index },
+            newBlock.nonce
+        )
+        if (blockHash !== newBlock.hash) {
+            res.status(400).json({ note: 'Invalid block hash' })
+            return
+        }
         bitcoin.chain.push(newBlock)
         bitcoin.pendingTransactions = []
         res.json({
@@ -149,7 +172,12 @@ app.post('/receive-new-block', function (req, res) {
 
 app.post('/register-and-broadcast-node', function (req, res) {
     const newNodeUrl = req.body.newNodeUrl as string
-
+    try {
+        new URL(newNodeUrl)
+    } catch {
+        res.status(400).json({ error: 'Invalid URL format' })
+        return
+    }
     if(bitcoin.currentNodeUrl === newNodeUrl) {
         res.json({ note: `Current node cannot be registered` });
         return;
@@ -171,7 +199,7 @@ app.post('/register-and-broadcast-node', function (req, res) {
                 json: true,
             }
 
-            rp(requestOptions)
+            return rp(requestOptions)
         })
 
         Promise.all(regNodesPromises)
