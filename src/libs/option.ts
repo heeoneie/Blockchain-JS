@@ -69,11 +69,8 @@ export class None<T> extends OptionImplBase<T> {
 }
 
 export const nullable = <T>(t: T | undefined | null): Option<T> => {
-    if (t) {
-        return new Some(t)
-    } else {
-        return new None()
-    }
+    if (t !== null && t !== undefined) return new Some(t)
+    else return new None()
 }
 
 export const some = <T>(t: T): Option<T> => new Some(t)

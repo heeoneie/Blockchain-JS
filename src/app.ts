@@ -37,6 +37,14 @@ app.post('/transaction', function (req, res) {
         res.status(400).json({ error: 'Missing required transaction fields' })
         return
     }
+    if (typeof newTransaction.amount !== 'number' || newTransaction.amount <= 0) {
+        res.status(400).json({ error: 'Invalid amount' })
+        return
+    }
+    if (typeof newTransaction.sender !== 'string' || typeof newTransaction.recipient !== 'string') {
+        res.status(400).json({ error: 'Invalid sender or recipient' })
+        return
+    }
     bitcoin.addTransactionToPendingTransactions(newTransaction).let((result) => {
         responseWith({
             res,
@@ -64,7 +72,11 @@ app.post('/transaction/broadcast', async function (req, res) {
     }
     const newTransaction = result.unwrap()
 
-    bitcoin.addTransactionToPendingTransactions(newTransaction)
+    const addResult = bitcoin.addTransactionToPendingTransactions(newTransaction)
+    if (addResult.isErr) {
+        coreErrorToWebResponse(res, addResult.unwrapErr())
+        return
+    }
     const requestPromises = bitcoin.networkNodes.map((networkNodeUrl) => {
         const requestOptions = {
             uri: networkNodeUrl + '/transaction',
@@ -84,7 +96,8 @@ app.post('/transaction/broadcast', async function (req, res) {
     }
 })
 
-const MINING_REWARD = process.env.MINING_REWARD ? parseFloat(process.env.MINING_REWARD) : 12.5
+const parsedReward = process.env.MINING_REWARD ? parseFloat(process.env.MINING_REWARD) : null
+const MINING_REWARD = parsedReward && !isNaN(parsedReward) ? parsedReward : 12.5
 app.get('/mine', function (req, res) {
     const lastBlock = bitcoin.lastBlock
     const previousBlockHash = lastBlock.hash
@@ -264,7 +277,7 @@ app.get('/consensus', function (_req, res) {
 
         if (
             !newLongestChain ||
-            (newLongestChain && !bitcoin.chainIsValid(newLongestChain))
+            (newLongestChain && bitcoin.chainIsValid(newLongestChain).isErr)
         ) {
             res.json({
                 note: 'Current chain has not been replaced.',

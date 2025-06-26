@@ -189,13 +189,9 @@ abstract class ResultImplBase<T, E> implements Result<T, E> {
         })
     }
 
-    transpose(): Option<Result<T, E>> {
+    transpose<U>(this: Result<Option<U>, E>): Option<Result<U, E>> {
         return this.mapEach({
-            Ok: (t) =>
-                nullable(t).mapEach({
-                    Some: (x) => some(ok(x)),
-                    None: () => none(),
-                }),
+            Ok: (opt) => opt.map((val) => ok(val)),
             Err: (e) => some(err(e)),
         })
     }
